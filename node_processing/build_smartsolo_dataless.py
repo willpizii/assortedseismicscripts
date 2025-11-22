@@ -17,6 +17,7 @@ Edited by Will Pizii, November 2025
 from pathlib import Path
 import pandas as pd
 from copy import deepcopy
+import traceback, sys
 
 from obspy import UTCDateTime
 from obspy.clients.nrl import NRL
@@ -29,9 +30,9 @@ from obspy.core.inventory import (Inventory, Network, Station, Channel, Site,
 
 NET_CODE = "RK"
 NET_DESCRIPTION = "Reykjanes nodes September-November 2025"
-STATIONS_CSV = "/raid2/wp280/PhD/reykjanes/nodes/dataless/node_locations_times.csv"
+STATIONS_CSV = "/raid2/wp280/PhD/reykjanes/nodes/dataless/node_locations_times_nov.csv"
 
-OUTPUT_XML = "/raid2/wp280/PhD/reykjanes/nodes/dataless/smartsolo_response.xml"
+OUTPUT_XML = "/raid2/wp280/PhD/reykjanes/nodes/dataless/smartsolo_responseTEST.xml"
 
 # If only one deployment, these should be strings. 
 # If replaced, then they should be lists e.g. ['start_1', 'start_2']
@@ -39,10 +40,11 @@ OUTPUT_XML = "/raid2/wp280/PhD/reykjanes/nodes/dataless/smartsolo_response.xml"
 start_name = ['start_1','start_2']
 end_name = ['end_1', 'end_2']
 serial = ['node_1', 'node_2']
+loc_codes = ['00', '10']
 
-# Number of replacements should match length of lists above 
+# Number of deployments should match length of lists above, or 0 if not redeployed
 
-replacements = 1
+deployments = 2
 
 # Sensor parameters
 
@@ -101,29 +103,36 @@ for _, station_row in station_df.iterrows():
     print(f"Working on {station_row.code}")
 
     try:
+        station_start = next(v for v in (station_row[n] for n in start_name) if not pd.isna(v))
+        station_end = next(v for v in (station_row[n] for n in end_name[::-1]) if not pd.isna(v))
+
+
         sta = Station(code=station_row.code,
                   latitude=Latitude(station_row.latitude),
                   longitude=Longitude(station_row.longitude),
                   elevation=station_row.elevation,
                   site=Site(name=station_row.description),
-                  start_date=parse_startdate(station_row[start_name]),
-                  end_date=parse_startdate(station_row[end_name]),
+                  start_date=parse_startdate(station_start),
+                  end_date=parse_startdate(station_end),
                   creation_date=UTCDateTime.now())
-    except:
-        continue
+        
+    except Exception as e:
+        print("Exception type:", type(e).__name__)
+        print("Exception message:", e)
+        print("Traceback:")
+        traceback.print_exc(file=sys.stdout)
+        break
 
-    if replacements != 0:
-        if len(start_name) != replacements or len(end_name) != replacements or len(serial) != replacements:
+    if deployments != 0:
+        if len(start_name) != deployments or len(end_name) != deployments or len(serial) != deployments:
             raise ValueError(
-                f"Mismatch: expected {replacements} entries, "
+                f"Mismatch: expected {deployments} entries, "
                 f"got start_name={len(start_name)}, end_name={len(end_name)}, serial={len(serial)}"
             )
 
         repl_iter = zip(start_name, end_name, serial)
-        loc_codes = [f"{i*10:02d}" for i in range(len(serial))]
     else:
         repl_iter = [(start_name, end_name, serial)]
-        loc_codes = ["00"]
 
     for (start, end, sn), loc_code in zip(repl_iter, loc_codes):
         if sn == "-" or pd.isna(station_row[start]) or pd.isna(station_row[end]):
@@ -143,7 +152,7 @@ for _, station_row in station_df.iterrows():
                 start_date=parse_startdate(station_row[start]),
                 end_date=parse_startdate(station_row[end]),
                 sensor=Equipment(type="SmartSolo IGU-16HR 3C 5 Hz",
-                                serial_number=station_row[sn])
+                                serial_number=int(station_row[sn]))
             )
             cha.response = deepcopy(SMARTSOLO_RESP)
             sta.channels.append(cha)
