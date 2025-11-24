@@ -21,24 +21,28 @@ station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-test/csvs/pairs_ftan_c
 
 method = 'phase'	# phase or group (though group is dodgy)
 maxv = 4000 		# cutoff maximum velocity
-minv = 1500 		# cutoff minimum velocity
-maxP = 10 		# maximum wave period to be used
-dP = 0.25 		# difference in wave periods analysed
+minv = 1000 		# cutoff minimum velocity
+
+f_type = 'fixed'    # 'fixed' or 'dependent' filter width type
+maxP = 10 		    # maximum wave period to be used
+dP = 0.25 		    # difference in wave periods analysed - absolute dP for 'fixed', or as fraction of period for 'dependent'
 
 snr_thresh = 1.5	# signal to noise threshold for dispersion picking
 dv_thresh = [-20,+80]	# for regional curve, minimum and maximum jump dv
 
 step_jump = 2		# maximum number of periods skipped in picking individual dispersions
-which = ['a', 'c']	# see disp_man_pick.py - which picks to read in
+which = ['a', 'c']	# see disp_man_pick.py - which picks to read in of 'a', 'c' and 'd'
 
 vgrid_size = 500	# velocity steps of the dense grid (for paired dispersions)
 reg_vgrid_size = 50	# velocity steps of the coarse grid (for regional curve addition)
+
+peaks = 'maxima'    # where to pick peaks on FTAN - 'maxima' or 'zero_crosses'
 
 out_json = "picked_ridges_ROB.json"
 
 pick_stats = True   # print statistics about the picked dispersion curves
 
-wavelengths = 2
+wavelengths = 1
 ref_vel = 3000
 
 ##############
@@ -160,7 +164,10 @@ def proc_row(idx):
 
     for i, zc in enumerate(zero_crosses):
         period = zc["period"]
-        v_this = vgrid[zc["zero_cross_indices"]]  # convert indices to velocity
+        if peaks == 'zero_crosses':
+            v_this = vgrid[zc["zero_cross_indices"]]  # convert indices to velocity
+        elif peaks == 'maxima':
+            v_this = vgrid[zc["maxima_indices"]]
 
         if wavelengths * period >= dist / ref_vel:
             continue
@@ -237,7 +244,13 @@ for pair, data in stack_dict.items():
             continue
 
         temp_density = np.zeros(len(vgrid_fine))
-        for idx in np.concatenate([zc['maxima_indices'], zc['minima_indices']]):
+
+        if peaks == 'zero_crosses':
+            bg_points = np.concatenate([zc['maxima_indices'], zc['minima_indices']])
+        elif peaks == 'maxima':
+            bg_points = zc['maxima_indices']
+
+        for idx in bg_points:
             if 5 <= idx < len(vgrid_fine)-5:
                 temp_density[idx] += 1
 

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 try:
     from tqdm import tqdm
 except:
-    def tdqm(x):
+    def tqdm(x):
         return x
 import pandas as pd
 
@@ -14,12 +14,12 @@ import pandas as pd
 # PARAMETERS #
 ##############
 
-input_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-test/STACKS/01/001_DAYS/ZZ/*'
-stack_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-test/robust/CC/ZZ'
-egf_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-test/robust/EGF/ZZ'
+input_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/STACKS/01/001_DAYS/ZZ/*'
+stack_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/CC/ZZ'
+egf_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ'
 
 # for plotting move out
-pairs_csv = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-test/csvs/all_stations_pairs.csv'
+pairs_csv = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/csvs/nov_node_pairs.csv'
 
 ##############
 

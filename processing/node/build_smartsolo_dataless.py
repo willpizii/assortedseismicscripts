@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 from copy import deepcopy
 import traceback, sys
+from datetime import timedelta
 
 from obspy import UTCDateTime
 from obspy.clients.nrl import NRL
@@ -39,12 +40,16 @@ OUTPUT_XML = "/raid2/wp280/PhD/reykjanes/nodes/dataless/smartsolo_responseTEST.x
 
 start_name = ['start_1','start_2']
 end_name = ['end_1', 'end_2']
-serial = ['node_1', 'node_2']
+col_node = ['node_1', 'node_2']
 loc_codes = ['00', '10']
 
 # Number of deployments should match length of lists above, or 0 if not redeployed
 
 deployments = 2
+
+# Time to buffer each end of the data recording for start and end times of response
+
+buffer = 60             # in seconds
 
 # Sensor parameters
 
@@ -106,14 +111,13 @@ for _, station_row in station_df.iterrows():
         station_start = next(v for v in (station_row[n] for n in start_name) if not pd.isna(v))
         station_end = next(v for v in (station_row[n] for n in end_name[::-1]) if not pd.isna(v))
 
-
         sta = Station(code=station_row.code,
                   latitude=Latitude(station_row.latitude),
                   longitude=Longitude(station_row.longitude),
                   elevation=station_row.elevation,
                   site=Site(name=station_row.description),
-                  start_date=parse_startdate(station_start),
-                  end_date=parse_startdate(station_end),
+                  start_date=parse_startdate(station_start) - timedelta(seconds=buffer),
+                  end_date=parse_startdate(station_end) + timedelta(seconds=buffer),
                   creation_date=UTCDateTime.now())
         
     except Exception as e:
@@ -124,17 +128,25 @@ for _, station_row in station_df.iterrows():
         break
 
     if deployments != 0:
-        if len(start_name) != deployments or len(end_name) != deployments or len(serial) != deployments:
+        if len(start_name) != deployments or len(end_name) != deployments or len(col_node) != deployments:
             raise ValueError(
                 f"Mismatch: expected {deployments} entries, "
-                f"got start_name={len(start_name)}, end_name={len(end_name)}, serial={len(serial)}"
+                f"got start_name={len(start_name)}, end_name={len(end_name)}, serial={len(col_node)}"
             )
 
-        repl_iter = zip(start_name, end_name, serial)
-    else:
-        repl_iter = [(start_name, end_name, serial)]
+        if not station_row[col_node].isna().any().any():
+            repl_iter = zip(zip(start_name, end_name, col_node), loc_codes)
+        else:
+            station_starts = [n for n in start_name if not pd.isna(station_row[n])]
+            station_ends = [n for n in end_name if not pd.isna(station_row[n])]
+            station_nodes = [n for n in col_node if not pd.isna(station_row[n])]
 
-    for (start, end, sn), loc_code in zip(repl_iter, loc_codes):
+            repl_iter = zip(zip(station_starts, station_ends, station_nodes), loc_codes[:len(station_starts)])
+            
+    else:
+        repl_iter = [(start_name, end_name, col_node)]
+
+    for (start, end, sn), loc_code in repl_iter:
         if sn == "-" or pd.isna(station_row[start]) or pd.isna(station_row[end]):
             continue
 
