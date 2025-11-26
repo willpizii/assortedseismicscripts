@@ -13,15 +13,15 @@ import json
 # PARAMETERS #
 ##############
 
-stack_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-test/pws/EGF/ZZ"
-station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-test/csvs/pairs_ftan_check.csv"
-sta1 = "SECO"
-sta2 = "KEFN"
+stack_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ"
+station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_node_pairs.csv"
+sta1 = "SVIN"
+sta2 = "SVAT"
 net = "RK"
 
 # If a picks json file exists, this will plot the picked curve on the FTAN image
 
-json_file = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-test/picked_ridges_ROB.json'    # path or None
+json_file = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_ROB.json'    # path or None
 
 method = 'phase'
 maxv = 4000

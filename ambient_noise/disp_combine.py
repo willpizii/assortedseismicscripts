@@ -16,8 +16,8 @@ import json
 
 net = "RK"
 
-stack_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-test/pws/EGF/ZZ"
-station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-test/csvs/pairs_ftan_check.csv"
+stack_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ"
+station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_node_pairs.csv"
 
 method = 'phase'	# phase or group (though group is dodgy)
 maxv = 4000 		# cutoff maximum velocity
@@ -31,7 +31,7 @@ snr_thresh = 1.5	# signal to noise threshold for dispersion picking
 dv_thresh = [-20,+80]	# for regional curve, minimum and maximum jump dv
 
 step_jump = 2		# maximum number of periods skipped in picking individual dispersions
-which = ['a', 'c']	# see disp_man_pick.py - which picks to read in of 'a', 'c' and 'd'
+which = None	    # see disp_man_pick.py - which picks to read in of 'a', 'c' and 'd'. Or None to skip
 
 vgrid_size = 500	# velocity steps of the dense grid (for paired dispersions)
 reg_vgrid_size = 50	# velocity steps of the coarse grid (for regional curve addition)
@@ -54,8 +54,9 @@ stack_dict = {}
 def proc_row(idx):
     row = seps.loc[idx]
 
-    if row['ftan_check'] not in which:
-        return
+    if which:
+        if row['ftan_check'] not in which:
+            return
 
     sta1 = row['station1']
     sta2 = row['station2']    

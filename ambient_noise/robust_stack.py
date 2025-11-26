@@ -18,9 +18,6 @@ input_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/STACKS/01/001_DAYS/ZZ
 stack_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/CC/ZZ'
 egf_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ'
 
-# for plotting move out
-pairs_csv = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/csvs/nov_node_pairs.csv'
-
 ##############
 
 def robust_stack(ncfs, eps = 1e-5, max_iters = 2000, window = None):
