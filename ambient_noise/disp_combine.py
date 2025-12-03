@@ -8,7 +8,7 @@ from scipy.signal import find_peaks, hilbert
 from scipy.ndimage import gaussian_filter, maximum_filter1d
 from matplotlib.gridspec import GridSpec
 from tqdm import tqdm
-import json
+import json, os
 
 ##############
 # PARAMETERS #
@@ -16,16 +16,17 @@ import json
 
 net = "RK"
 
-stack_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ"
-station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_node_pairs.csv"
+stack_dir = "/space/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ"
+station_pairs = "/space/wp280/PhD/reykjanes/nodes/msnoise-main/nov_all_pairs.csv"
 
 method = 'phase'	# phase or group (though group is dodgy)
 maxv = 4000 		# cutoff maximum velocity
 minv = 1000 		# cutoff minimum velocity
 
-f_type = 'fixed'    # 'fixed' or 'dependent' filter width type
-maxP = 10 		    # maximum wave period to be used
-dP = 0.25 		    # difference in wave periods analysed - absolute dP for 'fixed', or as fraction of period for 'dependent'
+f_type = 'relative' # 'fixed' or 'relative' filter width type
+maxP = 10.0		    # maximum wave period to be used
+minP = 1.0          # minimum wave period to be used
+dP = 0.05		    # difference in wave periods analysed - constant dP for 'fixed'; minimum dP for 'variable'
 
 snr_thresh = 1.5	# signal to noise threshold for dispersion picking
 dv_thresh = [-20,+80]	# for regional curve, minimum and maximum jump dv
@@ -61,27 +62,42 @@ def proc_row(idx):
     sta1 = row['station1']
     sta2 = row['station2']    
 
+    if not os.path.exists(f"{stack_dir}/{net}_{sta1}_{net}_{sta2}.mseed"):
+        print("No stack found for",sta1,sta2,", skipping...")
+        return
+
     st = read(f"{stack_dir}/{net}_{sta1}_{net}_{sta2}.mseed")
 
     dist = row['gcm']
 
     # Period range and other initializations
-    periods = np.arange(dP, dP*((maxP/dP)+1), dP)
+    if f_type == 'fixed':
+        periods = np.arange(minP, maxP * dP, dP)
+    elif f_type == 'relative':
+        periods = np.logspace(np.log10(minP), np.log10(maxP), int((np.log10(maxP/minP))/np.log10(1 + dP) + 1))
+
     fsts = {}
     vgrid = np.linspace(minv, maxv, vgrid_size)  # velocities in m/s
 
     # Bandpass filter and FTAN processing
     for P0 in periods:
-        # avoid zero or negative period
-        half = dP / 2.0
-        P_low = max(P0 - half, 1e-6)
-        P_high = P0 + half
+        
+        if f_type == 'fixed':
+            half = dP / 2.0
+            P_low = max(P0 - half, 1e-6)
+            P_high = P0 + half
 
-        freq_min = 1.0 / P_high
-        freq_max = 1.0 / P_low 
+            freq_min = 1.0 / P_high
+            freq_max = 1.0 / P_low 
+        
+        elif f_type == 'relative':
+            factor = np.sqrt(1 + dP)
 
-        if freq_min >= freq_max:
-            continue
+            P_low = P0 / factor
+            P_high = P0 * factor
+
+            freq_min = 1.0 / P_high
+            freq_max = 1.0 / P_low
 
         fst = st.copy().filter("bandpass", freqmin=freq_min, freqmax=freq_max, corners=4, zerophase=True)
         if method == 'group':
@@ -162,6 +178,7 @@ def proc_row(idx):
         })
     
     ridges = []
+    last_periods = []
 
     for i, zc in enumerate(zero_crosses):
         period = zc["period"]
@@ -183,16 +200,20 @@ def proc_row(idx):
                 ridges.append([(period, v)])
             continue
 
-        # attach each v_this to existing ridges from previous period
+        if not last_periods:
+            last_periods.append(period)
+            continue
+
         ridges_next = [r[:] for r in ridges]
         attached = [False] * len(v_this)
 
+        # safe lookup
+        ref_period = last_periods[-min(len(last_periods), step_jump)]
+
         for idx_r, ridge in enumerate(ridges):
             prev_p, prev_v = ridge[-1]
-            period_step = periods_array[1] - periods_array[0]
 
-            # find periods within one or two steps ahead
-            if abs(prev_p - period) <= step_jump * period_step:
+            if prev_p >= ref_period:
                 for idx_v, v in enumerate(v_this):
                     if attached[idx_v]:
                         continue
@@ -207,6 +228,7 @@ def proc_row(idx):
                 ridges_next.append([(period, v)])
 
         ridges = ridges_next
+        last_periods.append(period)
 
     stack_dict[f'{sta1}_{sta2}'] = {
         'disp_array': disp_array,
@@ -221,8 +243,6 @@ print("Creating and analysing FTAN...")
 
 for idx in tqdm(range(len(seps))):
     proc_row(idx)
-
-
 
 # Original grids
 periods = stack_dict[next(iter(stack_dict))]['periods_array']
@@ -294,7 +314,7 @@ for p in periods_unique:
         attached = [False]*len(v_this)
         for idx_r, ridge in enumerate(ridges):
             prev_p, prev_v = ridge[-1]
-            if prev_p == p - (periods[1]-periods[0]):  # previous period
+            if prev_p == last_p:  # previous period
                 for idx_v, v in enumerate(v_this):
                     if not attached[idx_v] and dv_thresh[0] <= (v - prev_v) <= dv_thresh[1]:
                         ridges_next[idx_r].append((p, v))
@@ -304,6 +324,8 @@ for p in periods_unique:
             if not attached[idx_v]:
                 ridges_next.append([(p, v)])
         ridges = ridges_next
+
+    last_p = p
 
 # Plot density
 fig, ax = plt.subplots(figsize=(12, 6))

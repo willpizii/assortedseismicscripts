@@ -8,7 +8,7 @@ import os
 ##############
 
 msnoise_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/"
-out_csv = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_node_pairs.csv"
+out_csv = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_all_pairs.csv"
 
 ##############
 

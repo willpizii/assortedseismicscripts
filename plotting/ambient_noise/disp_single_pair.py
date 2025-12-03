@@ -14,9 +14,9 @@ import json
 ##############
 
 stack_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ"
-station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_node_pairs.csv"
-sta1 = "SVIN"
-sta2 = "SVAT"
+station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_all_pairs.csv"
+sta1 = "VIGR"
+sta2 = "ELDV"
 net = "RK"
 
 # If a picks json file exists, this will plot the picked curve on the FTAN image

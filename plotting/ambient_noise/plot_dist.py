@@ -18,7 +18,7 @@ args = parser.parse_args()
 ##############      
 
 stack_dir  = args.stack_dir  or '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/CC/ZZ'
-pairs_csv  = args.pairs_csv  or '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_node_pairs.csv'
+pairs_csv  = args.pairs_csv  or '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_all_pairs.csv'
 refilter   = args.refilter if args.refilter else None                       # None or [low, high] frequency filters
 syn_source = args.syn_source or None                                        # Only plot pairs including one station
 
