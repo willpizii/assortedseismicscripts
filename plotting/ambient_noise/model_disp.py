@@ -3,7 +3,8 @@ from pysurf96 import surf96
 import matplotlib.pyplot as plt
 import json
 
-disp_json = "/space/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_DEP.json"
+disp_json = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_DEP.json"
+outfile = "model_dispersion.png"
 
 model = 'All' # 'Weir' 'Jenkins' or 'All'
 
@@ -131,7 +132,8 @@ if disp_json:
     ax.set_xlabel("Period (s)")
     ax.set_ylabel("Velocity (m/s)")
     ax.set_title("Loaded Dispersion Curves")
-    plt.show()
 
+if outfile:
+    plt.savefig(outfile)
 
 plt.show()

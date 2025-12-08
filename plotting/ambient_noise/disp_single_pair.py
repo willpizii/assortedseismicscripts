@@ -8,6 +8,14 @@ from scipy.signal import find_peaks, hilbert
 from matplotlib.gridspec import GridSpec
 from tqdm import tqdm
 import json
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("sta1", nargs="?")
+parser.add_argument("sta2", nargs="?")
+parser.add_argument("f_type", nargs="?")
+parser.add_argument("dP", nargs="?")
+args = parser.parse_args()
 
 ##############
 # PARAMETERS #
@@ -15,19 +23,23 @@ import json
 
 stack_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ"
 station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_all_pairs.csv"
-sta1 = "VIGR"
-sta2 = "ELDV"
+sta1 = args.sta1 or "VIGR"
+sta2 = args.sta2 or "ELDV"
 net = "RK"
 
 # If a picks json file exists, this will plot the picked curve on the FTAN image
 
-json_file = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_ROB.json'    # path or None
+json_file = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_DEP.json'    # path or None
+outfile = 'single_dispersion.png'
 
 method = 'phase'
+f_type = args.f_type or 'relative'
+
 maxv = 4000
 minv = 1500
 maxP = 10
-dP = 0.25
+minP = 0.5
+dP = float(args.dP) if args.dP else 0.08
 
 ##############
 
@@ -41,24 +53,43 @@ st = read(f"{stack_dir}/{net}_{sta1}_{net}_{sta2}.mseed")
 dist = float(seps[(seps['station1'] == sta1) & (seps['station2'] == sta2)]['gcm'].iloc[0])
 
 # Period range and other initializations
-periods = np.arange(dP, dP*((maxP/dP)+1), dP)
+if f_type == 'fixed':
+    periods = np.arange(minP, maxP + dP, dP)
+elif f_type == 'relative':
+    periods = np.logspace(np.log10(minP), np.log10(maxP), int((np.log10(maxP/minP))/np.log10(1 + dP) + 1))
+elif f_type == 'inverse':
+    freqs = np.arange(1 / maxP, 1 / minP, dP)
+    periods = 1 / freqs
+
 fsts = {}
 vgrid = np.linspace(minv, maxv, 250)  # velocities in m/s
 
 # Bandpass filter and FTAN processing
 for P0 in periods:
-    # avoid zero or negative period
-    half = dP / 2.0
-    P_low = max(P0 - half, 1e-6)
-    P_high = P0 + half
+    if f_type == 'fixed':
+        half = dP / 2.0
+        P_low = max(P0 - half, 1e-6)
+        P_high = P0 + half
 
-    freq_min = 1.0 / P_high
-    freq_max = 1.0 / P_low 
+        freq_min = 1.0 / P_high
+        freq_max = 1.0 / P_low 
+    
+    elif f_type == 'relative':
+        factor = np.sqrt(1 + dP)
 
-    if freq_min >= freq_max:
-        continue
+        P_low = P0 / factor
+        P_high = P0 * factor
 
-    fst = st.copy().filter("bandpass", freqmin=freq_min, freqmax=freq_max, corners=4, zerophase=True)
+        freq_min = 1.0 / P_high
+        freq_max = 1.0 / P_low
+
+    elif f_type == 'inverse':
+        half = dP / 2.0
+
+        freq_min = 1 / P0 - half
+        freq_max = 1 / P0 + half
+
+    fst = st.copy().filter("bandpass", freqmin=freq_min, freqmax=freq_max, corners=6, zerophase=True)
     if method == 'group':
         for tr in fst:
             tr.data = envelope(tr.data)
@@ -200,4 +231,8 @@ cb = fig.colorbar(c, cax=cax, orientation="vertical")
 cb.set_label("Normalized Amplitude")
 
 ax.set_title(f'FTAN of {sta1}-{sta2} : Distance {dist:.0f}')
+
+if outfile:
+    plt.savefig(outfile)
+
 plt.show()

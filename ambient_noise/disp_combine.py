@@ -16,20 +16,20 @@ import json, os
 
 net = "RK"
 
-stack_dir = "/space/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ"
-station_pairs = "/space/wp280/PhD/reykjanes/nodes/msnoise-main/nov_all_pairs.csv"
+stack_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ"
+station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_all_pairs.csv"
 
 method = 'phase'	# phase or group (though group is dodgy)
 maxv = 4000 		# cutoff maximum velocity
 minv = 1000 		# cutoff minimum velocity
 
-f_type = 'relative' # 'fixed' or 'relative' filter width type
+f_type = 'relative' # 'fixed', 'relative' or 'inverse' filter width type
 maxP = 10.0		    # maximum wave period to be used
 minP = 1.0          # minimum wave period to be used
 dP = 0.05		    # difference in wave periods analysed - constant dP for 'fixed'; minimum dP for 'variable'
 
 snr_thresh = 1.5	# signal to noise threshold for dispersion picking
-dv_thresh = [-20,+80]	# for regional curve, minimum and maximum jump dv
+dv_thresh = [-20,+120]	# for regional curve, minimum and maximum jump dv
 
 step_jump = 2		# maximum number of periods skipped in picking individual dispersions
 which = None	    # see disp_man_pick.py - which picks to read in of 'a', 'c' and 'd'. Or None to skip
@@ -39,7 +39,7 @@ reg_vgrid_size = 50	# velocity steps of the coarse grid (for regional curve addi
 
 peaks = 'maxima'    # where to pick peaks on FTAN - 'maxima' or 'zero_crosses'
 
-out_json = "picked_ridges_ROB.json"
+out_json = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_DEP.json"
 
 pick_stats = True   # print statistics about the picked dispersion curves
 
@@ -75,6 +75,9 @@ def proc_row(idx):
         periods = np.arange(minP, maxP * dP, dP)
     elif f_type == 'relative':
         periods = np.logspace(np.log10(minP), np.log10(maxP), int((np.log10(maxP/minP))/np.log10(1 + dP) + 1))
+    elif f_type == 'inverse':
+        freqs = np.arange(1 / maxP, 1 / minP, dP)
+        periods = 1 / freqs
 
     fsts = {}
     vgrid = np.linspace(minv, maxv, vgrid_size)  # velocities in m/s
@@ -98,6 +101,13 @@ def proc_row(idx):
 
             freq_min = 1.0 / P_high
             freq_max = 1.0 / P_low
+        
+        elif f_type == 'inverse':
+            half = dP / 2.0
+
+            freq_min = 1 / P0 - half
+            freq_max = 1 / P0 + half
+
 
         fst = st.copy().filter("bandpass", freqmin=freq_min, freqmax=freq_max, corners=4, zerophase=True)
         if method == 'group':
