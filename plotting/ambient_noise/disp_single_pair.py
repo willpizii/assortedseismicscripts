@@ -21,16 +21,16 @@ args = parser.parse_args()
 # PARAMETERS #
 ##############
 
-stack_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ"
-station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_all_pairs.csv"
+stack_dir = "/space/wp280/CCFRFR/robust/EGF/ZZ"
+station_pairs = "/space/wp280/CCFRFR/nov_all_pairs.csv"
 sta1 = args.sta1 or "VIGR"
 sta2 = args.sta2 or "ELDV"
 net = "RK"
 
 # If a picks json file exists, this will plot the picked curve on the FTAN image
 
-json_file = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_DEP.json'    # path or None
-outfile = 'single_dispersion.png'
+json_file = '/space/wp280/CCFRFR/PICKS.json'    # path or None
+outfile = None # 'single_dispersion.png'
 
 method = 'phase'
 f_type = args.f_type or 'relative'
@@ -190,10 +190,12 @@ for zc in zero_crosses:
 if json_file:
     with open(json_file, 'r') as file:
             data = json.load(file)
-    curve = data[f'{net}_{sta1}_{net}_{sta2}']
+    try:
+        curve = data[f'{net}_{sta1}_{net}_{sta2}']
 
-    ax.plot(curve[0], [1000 * v for v in curve[1]], color="k")
-
+        ax.plot(curve[0], [1000 * v for v in curve[1]], color="k")
+    except:
+        pass
 # SNR plot
 ax2 = fig.add_subplot(gs[1, 0], sharex=ax)
 ax2.plot(periods_array, snrs, color="b", lw=1)

@@ -14,9 +14,9 @@ import pandas as pd
 # PARAMETERS #
 ##############
 
-input_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/STACKS/01/001_DAYS/ZZ/*'
-stack_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/CC/ZZ'
-egf_dir = '/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ'
+input_dir = '/space/wp280/CCFRFR/STACKS/01/001_DAYS/RR/*'
+stack_dir = '/space/wp280/CCFRFR/robust/CC/RR'
+egf_dir = '/space/wp280/CCFRFR/robust/EGF/RR'
 
 ##############
 

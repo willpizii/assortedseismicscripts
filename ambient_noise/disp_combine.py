@@ -16,8 +16,8 @@ import json, os
 
 net = "RK"
 
-stack_dir = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/robust/EGF/ZZ"
-station_pairs = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/nov_all_pairs.csv"
+stack_dir = "/space/wp280/CCFRFR/robust/EGF/ZZ"
+station_pairs = "/space/wp280/CCFRFR/nov_all_pairs.csv"
 
 method = 'phase'	# phase or group (though group is dodgy)
 maxv = 4000 		# cutoff maximum velocity
@@ -28,7 +28,7 @@ maxP = 10.0		    # maximum wave period to be used
 minP = 1.0          # minimum wave period to be used
 dP = 0.05		    # difference in wave periods analysed - constant dP for 'fixed'; minimum dP for 'variable'
 
-overlap = 0.4       # overlap degree between period filters - between 0.0 and 1.0
+overlap = 0.0       # overlap degree between period filters - between 0.0 and 1.0
 
 snr_thresh = 1.5	# signal to noise threshold for dispersion picking
 dv_thresh = [-30,+100]	# for curves, minimum and maximum jump dv
@@ -41,7 +41,7 @@ reg_vgrid_size = 50	# velocity steps of the coarse grid (for regional curve addi
 
 peaks = 'maxima'    # where to pick peaks on FTAN - 'maxima' or 'zero_crosses'
 
-out_json = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_TEST.json"
+out_json = "/space/wp280/CCFRFR/ZZ_PICKS.json"
 
 pick_stats = True   # print statistics about the picked dispersion curves
 

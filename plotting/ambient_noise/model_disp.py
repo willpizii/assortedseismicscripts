@@ -3,10 +3,11 @@ from pysurf96 import surf96
 import matplotlib.pyplot as plt
 import json
 
-disp_json = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_TEST.json"
-outfile = "model_dispersion.png"
+disp_json = "/space/wp280/CCFRFR/PICKS.json"
+outfile = None # "model_dispersion.png"
 
 model = 'All' # 'Weir' 'Jenkins' or 'All'
+wavetype = 'love'
 
 fig, ax = plt.subplots(figsize=[10,8])
 
@@ -108,7 +109,7 @@ def plot_model(model):
         vs,
         rho,
         periods,
-        wave="rayleigh",
+        wave=wavetype,
         mode=1,
         velocity="phase",
         flat_earth=True)
