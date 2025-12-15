@@ -28,8 +28,10 @@ maxP = 10.0		    # maximum wave period to be used
 minP = 1.0          # minimum wave period to be used
 dP = 0.05		    # difference in wave periods analysed - constant dP for 'fixed'; minimum dP for 'variable'
 
+overlap = 0.4       # overlap degree between period filters - between 0.0 and 1.0
+
 snr_thresh = 1.5	# signal to noise threshold for dispersion picking
-dv_thresh = [-20,+120]	# for regional curve, minimum and maximum jump dv
+dv_thresh = [-30,+100]	# for curves, minimum and maximum jump dv
 
 step_jump = 2		# maximum number of periods skipped in picking individual dispersions
 which = None	    # see disp_man_pick.py - which picks to read in of 'a', 'c' and 'd'. Or None to skip
@@ -39,7 +41,7 @@ reg_vgrid_size = 50	# velocity steps of the coarse grid (for regional curve addi
 
 peaks = 'maxima'    # where to pick peaks on FTAN - 'maxima' or 'zero_crosses'
 
-out_json = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_DEP.json"
+out_json = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_TEST.json"
 
 pick_stats = True   # print statistics about the picked dispersion curves
 
@@ -86,7 +88,7 @@ def proc_row(idx):
     for P0 in periods:
         
         if f_type == 'fixed':
-            half = dP / 2.0
+            half = dP / (2.0 - overlap)
             P_low = max(P0 - half, 1e-6)
             P_high = P0 + half
 
@@ -94,7 +96,7 @@ def proc_row(idx):
             freq_max = 1.0 / P_low 
         
         elif f_type == 'relative':
-            factor = np.sqrt(1 + dP)
+            factor = np.sqrt(1 + dP + overlap)
 
             P_low = P0 / factor
             P_high = P0 * factor
@@ -103,7 +105,7 @@ def proc_row(idx):
             freq_max = 1.0 / P_low
         
         elif f_type == 'inverse':
-            half = dP / 2.0
+            half = dP / (2.0 - overlap)
 
             freq_min = 1 / P0 - half
             freq_max = 1 / P0 + half
@@ -220,14 +222,17 @@ def proc_row(idx):
         # safe lookup
         ref_period = last_periods[-min(len(last_periods), step_jump)]
 
+        # build curves at zero-gradient points on FTAN images
         for idx_r, ridge in enumerate(ridges):
             prev_p, prev_v = ridge[-1]
+            v_to_eval = []
 
             if prev_p >= ref_period:
                 for idx_v, v in enumerate(v_this):
                     if attached[idx_v]:
                         continue
                     if dv_thresh[0] <= (v - prev_v) <= dv_thresh[1]:
+                        v_to_eval.append((period,v))
                         ridges_next[idx_r].append((period, v))
                         attached[idx_v] = True
                         break  # once attached, move to next ridge
@@ -435,6 +440,7 @@ if pick_stats:
     print("Picked dispersion curve statistics")
     print(f"Number of dispersion curves found / total station pairs: {len(selected_ridges)}/{len(seps)}")
     print(f"Number of periods picked per dispersion curve: {np.mean([len(k) for k in selected_ridges.keys()])} +/- {np.std([len(k) for k in selected_ridges.keys()])}")
+
     print(f"Average SNR at each period (of picked curves):")
     for period in periods:    
         idx = np.where(periods == period)[0][0]

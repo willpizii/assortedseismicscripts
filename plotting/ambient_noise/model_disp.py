@@ -3,12 +3,12 @@ from pysurf96 import surf96
 import matplotlib.pyplot as plt
 import json
 
-disp_json = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_DEP.json"
+disp_json = "/raid2/wp280/PhD/reykjanes/nodes/msnoise-main/picked_ridges_TEST.json"
 outfile = "model_dispersion.png"
 
 model = 'All' # 'Weir' 'Jenkins' or 'All'
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=[10,8])
 
 def plot_model(model):
     if model == 'Jenkins':  # Jenkins et al 2025
@@ -91,6 +91,11 @@ def plot_model(model):
             4.167,4.331,4.427
         ])
 
+    elif model == 'SW Fit':
+        thickness = np.array([0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5])
+        vs        = np.array([1.5,1.8,2.1,2.4,2.7,3.0,3.1,3.2,3.3,3.3,3.3,3.3,3.3,3.4,3.4,3.4,3.4,3.5,3.5,3.5,3.5,3.6])
+        vp        = vs * 1.74
+
 
     rho = vp * 0.32 + 0.77
 
@@ -110,28 +115,51 @@ def plot_model(model):
     
     ax.plot(periods,velocities, label=model)
 
+if disp_json:
+    with open(disp_json, "r") as f:
+        ridge_dict = json.load(f)
+    
+
+    all_p = np.unique(np.concatenate([np.array(v[0], float) for v in ridge_dict.values()]))
+    vals = {p: [] for p in all_p}
+
+    for key, data in ridge_dict.items():
+        p = np.array(data[0], dtype=float)
+        v = np.array(data[1], dtype=float)
+
+        ax.plot(p, v, lw=1, color="k", alpha=0.1)
+
+        for pi, vi in zip(p, v):
+            vals[pi].append(vi)
+
+    mean_periods = []
+    mean_vals = []
+    std_vals = []
+
+    for p in all_p:
+        if len(vals[p]) > 0:
+            mean_periods.append(p)
+            mean_vals.append(np.mean(vals[p]))
+            std_vals.append(np.std(vals[p]))
+
+    mean_periods = np.array(mean_periods)
+    mean_vals = np.array(mean_vals)
+    std_vals = np.array(std_vals)
+
+    ax.plot(mean_periods, mean_vals, lw=2, color="C6")
+    ax.fill_between(mean_periods, mean_vals - std_vals, mean_vals + std_vals, color='C6', alpha=0.5)
 
 if model == 'All':
-    for m in ['Weir', 'Jenkins', 'Allas', 'Southern']:
+    for m in ['Weir', 'Jenkins', 'Allas', 'Southern', 'SW Fit']:
         plot_model(m)
     ax.legend()
 
 else:
     plot_model(model)
 
-if disp_json:
-    with open(disp_json, "r") as f:
-        ridge_dict = json.load(f)
-
-    for key, data in ridge_dict.items():
-        periods_ridge = np.array(data[0], dtype=float)
-        v_ridge = np.array(data[1], dtype=float)
-
-        ax.plot(periods_ridge, v_ridge, lw=1, color="k")
-
-    ax.set_xlabel("Period (s)")
-    ax.set_ylabel("Velocity (m/s)")
-    ax.set_title("Loaded Dispersion Curves")
+ax.set_xlabel("Period (s)")
+ax.set_ylabel("Velocity (m/s)")
+ax.set_title("Loaded Dispersion Curves")
 
 if outfile:
     plt.savefig(outfile)

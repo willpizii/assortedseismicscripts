@@ -39,6 +39,7 @@ maxv = 4000
 minv = 1500
 maxP = 10
 minP = 0.5
+overlap = 0.0
 dP = float(args.dP) if args.dP else 0.08
 
 ##############
@@ -67,7 +68,7 @@ vgrid = np.linspace(minv, maxv, 250)  # velocities in m/s
 # Bandpass filter and FTAN processing
 for P0 in periods:
     if f_type == 'fixed':
-        half = dP / 2.0
+        half = dP / (2.0 - overlap)
         P_low = max(P0 - half, 1e-6)
         P_high = P0 + half
 
@@ -75,16 +76,16 @@ for P0 in periods:
         freq_max = 1.0 / P_low 
     
     elif f_type == 'relative':
-        factor = np.sqrt(1 + dP)
+        factor = np.sqrt(1 + dP + overlap)
 
         P_low = P0 / factor
         P_high = P0 * factor
 
         freq_min = 1.0 / P_high
         freq_max = 1.0 / P_low
-
+    
     elif f_type == 'inverse':
-        half = dP / 2.0
+        half = dP / (2.0 - overlap)
 
         freq_min = 1 / P0 - half
         freq_max = 1 / P0 + half
