@@ -16,7 +16,7 @@ import json, os
 
 net = "RK"
 
-stack_dir = "/space/wp280/CCFRFR/robust/EGF/ZZ"
+stack_dir = "/space/wp280/CCFRFR/robust/EGF/TT"
 station_pairs = "/space/wp280/CCFRFR/nov_all_pairs.csv"
 
 method = 'phase'	# phase or group (though group is dodgy)
@@ -30,7 +30,7 @@ dP = 0.05		    # difference in wave periods analysed - constant dP for 'fixed'; 
 
 overlap = 0.0       # overlap degree between period filters - between 0.0 and 1.0
 
-snr_thresh = 1.5	# signal to noise threshold for dispersion picking
+snr_thresh = 2.0	# signal to noise threshold for dispersion picking
 dv_thresh = [-30,+100]	# for curves, minimum and maximum jump dv
 
 step_jump = 2		# maximum number of periods skipped in picking individual dispersions
@@ -41,7 +41,7 @@ reg_vgrid_size = 50	# velocity steps of the coarse grid (for regional curve addi
 
 peaks = 'maxima'    # where to pick peaks on FTAN - 'maxima' or 'zero_crosses'
 
-out_json = "/space/wp280/CCFRFR/ZZ_PICKS.json"
+out_json = "/space/wp280/CCFRFR/TT_PICKS.json"
 
 pick_stats = True   # print statistics about the picked dispersion curves
 
@@ -131,15 +131,12 @@ def proc_row(idx):
             data = tr.data[mask]
 
             # Noise: RMS of the entire trace
-            rms_noise = np.sqrt(np.mean(np.abs(data)**2))
+            signal_mask = (v >= 1500) & (v <= 4000)
+            noise_mask  = (v < 1000) | (v > 4500)
 
-            vmask = (v >= vgrid.min()) & (v <= vgrid.max())
-            v = v[vmask]
-            data = data[vmask]
-
-            # Calculate the RMS for the signal (SNR calculation)
-            # Signal: RMS between 1.5 and 4 km/s (1500 to 4000 m/s)
-            rms_signal = np.sqrt(np.mean(np.abs(data)**2))
+            rms_signal = np.sqrt(np.mean(data[signal_mask]**2))
+            rms_noise  = np.sqrt(np.mean(data[noise_mask]**2))
+            snr = rms_signal / (rms_noise + 1e-12)
             
             if len(v) < 2:
                 continue  # cannot interpolate

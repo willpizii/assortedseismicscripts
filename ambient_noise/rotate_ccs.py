@@ -37,6 +37,9 @@ def rotate_pair(station1, station2):
             
     _, az, baz = obspy.geodetics.base.gps2dist_azimuth(station1.Y, station1.X,station2.Y, station2.X)
 
+    az *= (np.pi / 180)
+    baz *= (np.pi / 180)
+
     rot_matrix = np.array([[-cos(az) * cos(baz), cos(az) * sin(baz), -sin(az) * sin(baz), sin(az) * cos(baz)],
                   [-sin(az) * sin(baz), -sin(az) * cos(baz), -cos(az) * cos(baz), -cos(az) * sin(baz)],
                   [-cos(az) * sin(baz), -cos(az) * cos(baz), sin(az) * cos(baz), sin(az) * sin(baz)],

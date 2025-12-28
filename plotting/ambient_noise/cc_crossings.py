@@ -15,16 +15,17 @@ parser.add_argument("sta1", nargs="?")
 parser.add_argument("sta2", nargs="?")
 parser.add_argument("f_type", nargs="?")
 parser.add_argument("dP", nargs="?")
+parser.add_argument("--comp", default="ZZ")
 args = parser.parse_args()
 
 ##############
 # PARAMETERS #
 ##############
 
-stack_dir = "/space/wp280/CCFRFR/robust/EGF/ZZ"
+stack_dir = f"/space/wp280/CCFRFR/robust/CC/{args.comp}"
 station_pairs = "/space/wp280/CCFRFR/nov_all_pairs.csv"
-sta1 = args.sta1 or "VIGR"
-sta2 = args.sta2 or "ELDV"
+sta1 = args.sta1 or "SVIN"
+sta2 = args.sta2 or "KEFE"
 net = "RK"
 
 # If a picks json file exists, this will plot the picked curve on the FTAN image
@@ -36,7 +37,7 @@ method = 'phase'
 f_type = args.f_type or 'relative'
 
 maxv = 4000
-minv = 1500
+minv = 1000
 maxP = 10
 minP = 1.0
 overlap = 0.0
@@ -50,6 +51,15 @@ if sta1 > sta2:
 seps = pd.read_csv(station_pairs)
 
 st = read(f"{stack_dir}/{net}_{sta1}_{net}_{sta2}.mseed")
+
+tr = st[0]
+d = tr.data.astype(float)
+d /= np.max(np.abs(d))
+
+mid = d.size // 2
+d = d[:2*mid]
+s = 0.5 * (d[mid:] + d[:mid][::-1])
+tr.data = s
 
 dist = float(seps[(seps['station1'] == sta1) & (seps['station2'] == sta2)]['gcm'].iloc[0])
 
@@ -110,15 +120,12 @@ for P0, fst in fsts.items():
         data = tr.data[mask]
 
         # Noise: RMS of the entire trace
-        rms_noise = np.sqrt(np.mean(np.abs(data)**2))
+        signal_mask = (v >= 1500) & (v <= 4000)
+        noise_mask  = (v < 1000) | (v > 4500)
 
-        vmask = (v >= vgrid.min()) & (v <= vgrid.max())
-        v = v[vmask]
-        data = data[vmask]
-
-        # Calculate the RMS for the signal (SNR calculation)
-        # Signal: RMS between 1.5 and 4 km/s (1500 to 4000 m/s)
-        rms_signal = np.sqrt(np.mean(np.abs(data)**2))
+        rms_signal = np.sqrt(np.mean(data[signal_mask]**2))
+        rms_noise  = np.sqrt(np.mean(data[noise_mask]**2))
+        snr = rms_signal / (rms_noise + 1e-12)
         
         if len(v) < 2:
             continue  # cannot interpolate
@@ -152,17 +159,13 @@ periods_array = np.array(periods)
 # Find maxima/minima for analysis
 for i, data_resampled in enumerate(disp_array):
     try:
-        d1 = np.diff(data_resampled)
-        tp_indices = np.where(np.diff(np.sign(d1)) != 0)[0] + 1
-        d2 = np.diff(data_resampled, n=2)
-        maxima = [idx for idx in tp_indices if idx-1 < len(d2) and d2[idx-1] < 0]
-        minima = [idx for idx in tp_indices if idx-1 < len(d2) and d2[idx-1] > 0]
+        zc_idx = np.where(np.diff(np.sign(data_resampled)) != 0)[0]
     except Exception:
-        maxima, minima = [], []
+        zc_idx = []
+
     zero_crosses.append({
         "period": periods_array[i],
-        "maxima_indices": np.array(maxima, dtype=int),
-        "minima_indices": np.array(minima, dtype=int)
+        "zero_cross_indices": np.array(zc_idx, dtype=int)
     })
 
 fig = plt.figure(figsize=(10, 7))
@@ -170,22 +173,15 @@ gs = GridSpec(2, 1, height_ratios=[8, 1.5], hspace=0.05)
 
 # Main FTAN plot
 ax = fig.add_subplot(gs[0, 0])
-c = ax.contourf(periods_array, vgrid, disp_array.T, levels=100, cmap="coolwarm")
 ax.set_ylabel("Velocity (m/s)")
 ax.set_xlim(0.25, 10)
 ax.axvline(1 / (3000 / dist), ls="--", color="k")
 
 for zc in zero_crosses:
     P0 = zc["period"]
-    try:
-        if len(zc["maxima_indices"]) > 0:
-            ax.scatter([P0]*len(zc["maxima_indices"]),
-                        vgrid[zc["maxima_indices"]], color="k", marker="o", s=4)
-        if len(zc["minima_indices"]) > 0:
-            ax.scatter([P0]*len(zc["minima_indices"]),
-                        vgrid[zc["minima_indices"]], color="k", marker="o", s=4)
-    except Exception:
-        continue
+    idx = zc["zero_cross_indices"]
+    if idx.size:
+        ax.scatter([P0]*len(idx), vgrid[idx], color="k", s=4)
 
 if json_file:
     with open(json_file, 'r') as file:
@@ -206,34 +202,10 @@ ax2.grid(True)
 ax2.set_ylim(0, np.max(snrs) * 1.1)
 plt.setp(ax.get_xticklabels(), visible=False)
 
-# carve out space for a single vertical colorbar that spans both axes:
-fig.canvas.draw()  # ensure positions are computed
-pos0 = ax.get_position()
-pos1 = ax2.get_position()
-
-# colorbar width and pad (figure fraction)
-cb_width = 0.03
-pad = 0.01
-
-# new width for both axes (steal space for colorbar)
-new_width = pos0.width - (cb_width + pad)
-new_x0 = pos0.x0
-
-# re-set positions so both axes share identical left/right extents
-ax.set_position([new_x0, pos0.y0, new_width, pos0.height])
-ax2.set_position([new_x0, pos1.y0, new_width, pos1.height])
-
-# create a colorbar axis that spans from bottom of ax2 to top of ax
-cb_bottom = pos1.y0
-cb_top = pos0.y0 + pos0.height
-cb_height = cb_top - cb_bottom
-cax = fig.add_axes([new_x0 + new_width + pad, cb_bottom, cb_width, cb_height])
-
-# draw colorbar into that axis
-cb = fig.colorbar(c, cax=cax, orientation="vertical")
-cb.set_label("Normalized Amplitude")
-
 ax.set_title(f'FTAN of {sta1}-{sta2} : Distance {dist:.0f}')
+
+# ax.set_xscale("log")
+# ax2.set_xscale("log")
 
 if outfile:
     plt.savefig(outfile)

@@ -1,7 +1,7 @@
 import os, json, pandas as pd
 
 stations = pd.read_csv('/space/wp280/CCFRFR/frfr_stations.csv')
-json_pat = '/space/wp280/CCFRFR/PICKS.json'
+json_pat = '/space/wp280/CCFRFR/ZZ_PICKS.json'
 out_path = '/space/wp280/DAST/ReykjanesRawData'
 
 with open(json_pat, 'r') as f:

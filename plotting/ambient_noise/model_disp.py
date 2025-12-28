@@ -1,13 +1,13 @@
 import numpy as np
 from pysurf96 import surf96
 import matplotlib.pyplot as plt
-import json
+import json, os
 
-disp_json = "/space/wp280/CCFRFR/PICKS.json"
-outfile = None # "model_dispersion.png"
+disp_json = ["/space/wp280/CCFRFR/ZZ_PICKS.json", "/space/wp280/CCFRFR/TT_PICKS.json"] # either path (for Rayleigh) or list of [Rayleigh, Love]
+outfile = "model_dispersion.png"
 
 model = 'All' # 'Weir' 'Jenkins' or 'All'
-wavetype = 'love'
+wavetype = 'both' # 'rayleigh', 'love' or 'both'
 
 fig, ax = plt.subplots(figsize=[10,8])
 
@@ -95,7 +95,35 @@ def plot_model(model):
     elif model == 'SW Fit':
         thickness = np.array([0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5])
         vs        = np.array([1.5,1.8,2.1,2.4,2.7,3.0,3.1,3.2,3.3,3.3,3.3,3.3,3.3,3.4,3.4,3.4,3.4,3.5,3.5,3.5,3.5,3.6])
-        vp        = vs * 1.74
+        vp        = vs * 1.73
+
+    elif model == 'BBInv':
+        thickness = np.array([
+            0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+            0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+            0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+            0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+            0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+            0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
+            0.25
+        ])
+
+        vs = np.array([
+            1.45288843, 1.44507684, 1.62379505, 1.89368752, 1.99456806,
+            2.21659218, 2.31062620, 2.39914717, 2.56575916, 2.61948276,
+            2.72207439, 2.78094559, 2.88653910, 3.05656022, 3.13837114,
+            3.22533815, 3.29019520, 3.32983607, 3.34503619, 3.35085603,
+            3.34681162, 3.34833121, 3.32935858, 3.31371053, 3.28762516,
+            3.27791505, 3.27310712, 3.26500182, 3.26655925, 3.28417574,
+            3.30965255, 3.34207416, 3.39927314, 3.43809530, 3.47150879,
+            3.50685983, 3.52845831, 3.53307322, 3.53946398, 3.54627562,
+            3.54508167, 3.55004919, 3.53539124, 3.53440668, 3.52643928,
+            3.52721161, 3.52503412, 3.52063594, 3.52595597, 3.51577359,
+            3.51067485, 3.50688798, 3.50540929, 3.50153431, 3.50387358,
+            3.50449907, 3.50690125, 3.50387917, 3.49366891, 3.48402147,
+            3.47877810
+        ])
+        vp = vs * 1.73
 
 
     rho = vp * 0.32 + 0.77
@@ -103,20 +131,58 @@ def plot_model(model):
     # Periods we are interested in
     periods = np.linspace(1.0, 10.0, 20)
 
-    velocities = surf96(
-        thickness,
-        vp,
-        vs,
-        rho,
-        periods,
-        wave=wavetype,
-        mode=1,
-        velocity="phase",
-        flat_earth=True)
-    
-    ax.plot(periods,velocities, label=model)
+    if wavetype == "both":
+        velocities = surf96(
+            thickness,
+            vp,
+            vs,
+            rho,
+            periods,
+            wave='love',
+            mode=1,
+            velocity="phase",
+            flat_earth=True)
+        
+        ax.plot(periods,velocities, label=model+' love', color=f"C{j}")
 
-if disp_json:
+        velocities = surf96(
+            thickness,
+            vp,
+            vs,
+            rho,
+            periods,
+            wave="rayleigh",
+            mode=1,
+            velocity="phase",
+            flat_earth=True)
+        
+        ax.plot(periods,velocities, label=model+ ' rayleigh', color=f"C{j}", ls="--")
+
+    else:
+        velocities = surf96(
+            thickness,
+            vp,
+            vs,
+            rho,
+            periods,
+            wave=wavetype,
+            mode=1,
+            velocity="phase",
+            flat_earth=True)
+        
+        ax.plot(periods,velocities, label=model, color=f"C{j}")
+
+if model == 'All':
+    j=0
+    for m in ['Weir', 'Jenkins', 'Allas', 'Southern', 'SW Fit', 'BBInv']:
+        plot_model(m)
+        j+=1
+
+else:
+    j=0
+    plot_model(model)
+
+if disp_json and type(disp_json) == str:
     with open(disp_json, "r") as f:
         ridge_dict = json.load(f)
     
@@ -128,7 +194,7 @@ if disp_json:
         p = np.array(data[0], dtype=float)
         v = np.array(data[1], dtype=float)
 
-        ax.plot(p, v, lw=1, color="k", alpha=0.1)
+        ax.plot(p, v, lw=1, color=f"C{j}", alpha=0.1)
 
         for pi, vi in zip(p, v):
             vals[pi].append(vi)
@@ -147,17 +213,46 @@ if disp_json:
     mean_vals = np.array(mean_vals)
     std_vals = np.array(std_vals)
 
-    ax.plot(mean_periods, mean_vals, lw=2, color="C6")
-    ax.fill_between(mean_periods, mean_vals - std_vals, mean_vals + std_vals, color='C6', alpha=0.5)
+    ax.plot(mean_periods, mean_vals, lw=2, color=f"C{j}")
+    ax.fill_between(mean_periods, mean_vals - std_vals, mean_vals + std_vals, color=f"C{j}", alpha=0.5)
 
-if model == 'All':
-    for m in ['Weir', 'Jenkins', 'Allas', 'Southern', 'SW Fit']:
-        plot_model(m)
-    ax.legend()
+elif disp_json and type(disp_json) == list:
 
-else:
-    plot_model(model)
+    for dj, ls in zip(disp_json, ['--','-']):
+        j+=1
+        with open(dj, "r") as f:
+            ridge_dict = json.load(f)
+        
 
+        all_p = np.unique(np.concatenate([np.array(v[0], float) for v in ridge_dict.values()]))
+        vals = {p: [] for p in all_p}
+
+        for key, data in ridge_dict.items():
+            p = np.array(data[0], dtype=float)
+            v = np.array(data[1], dtype=float)
+
+            for pi, vi in zip(p, v):
+                vals[pi].append(vi)
+
+        mean_periods = []
+        mean_vals = []
+        std_vals = []
+
+        for p in all_p:
+            if len(vals[p]) > 0:
+                mean_periods.append(p)
+                mean_vals.append(np.mean(vals[p]))
+                std_vals.append(np.std(vals[p]))
+
+        mean_periods = np.array(mean_periods)
+        mean_vals = np.array(mean_vals)
+        std_vals = np.array(std_vals)
+
+        ax.plot(mean_periods, mean_vals, lw=2, color=f"C{j}", ls=ls,label=os.path.basename(dj).split(".")[0])
+        ax.fill_between(mean_periods, mean_vals - std_vals, mean_vals + std_vals, color=f"C{j}", alpha=0.5)
+
+
+ax.legend()
 ax.set_xlabel("Period (s)")
 ax.set_ylabel("Velocity (m/s)")
 ax.set_title("Loaded Dispersion Curves")

@@ -14,9 +14,9 @@ import pandas as pd
 # PARAMETERS #
 ##############
 
-input_dir = '/space/wp280/CCFRFR/STACKS/01/001_DAYS/RR/*'
-stack_dir = '/space/wp280/CCFRFR/robust/CC/RR'
-egf_dir = '/space/wp280/CCFRFR/robust/EGF/RR'
+input_dir = '/space/wp280/CCFRFR/STACKS/01/001_DAYS/TT/*'
+stack_dir = '/space/wp280/CCFRFR/robust/CC/TT'
+egf_dir = '/space/wp280/CCFRFR/robust/EGF/TT'
 
 ##############
 
