@@ -9,6 +9,7 @@ except:
     def tqdm(x):
         return x
 import pandas as pd
+from asnlib.stack import robust_stack
 
 ##############
 # PARAMETERS #
@@ -19,42 +20,6 @@ stack_dir = '/space/wp280/CCFRFR/robust/CC/TT'
 egf_dir = '/space/wp280/CCFRFR/robust/EGF/TT'
 
 ##############
-
-def robust_stack(ncfs, eps = 1e-5, max_iters = 2000, window = None):
-    # As described by Pavlis and Vernon, 2010
-    # Shown by Yang et al. 2023 to be good for phase dispersion
-    ncfs = np.asarray(ncfs, dtype=float)
-    N, M = ncfs.shape
-    start, end = (0, M)
-
-    b = np.median(ncfs, axis=0)
-
-    for _ in range(max_iters):
-        weights = np.zeros(N)
-        for i, d in enumerate(ncfs):
-            bj = b[start:end]
-            di = d[start:end]
-
-            top = np.linalg.norm(np.dot(bj,di))
-
-            ri = bj - np.dot(bj,di) * di
-
-            bottom = np.linalg.norm(di) * np.linalg.norm(ri)
-
-            weights[i] = top / bottom
-        
-        weights /= np.sum(weights)
-
-        b_u = np.sum(weights[:, None] * ncfs, axis=0)
-
-        crit = np.linalg.norm(b_u - b, 1) / np.linalg.norm(b_u, 2) * M
-
-        b=b_u
-        if crit < eps:
-            break
-
-
-    return b, weights
 
 paths = sorted(glob.glob(input_dir))
 os.makedirs(stack_dir, exist_ok=True)

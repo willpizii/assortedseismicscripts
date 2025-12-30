@@ -3,7 +3,7 @@ from pysurf96 import surf96
 import matplotlib.pyplot as plt
 import json, os
 
-disp_json = ["/space/wp280/CCFRFR/ZZ_PICKS.json", "/space/wp280/CCFRFR/TT_PICKS.json"] # either path (for Rayleigh) or list of [Rayleigh, Love]
+disp_json = ["/space/wp280/CCFRFR/ZZ_GROUP_PICKS.json", "/space/wp280/CCFRFR/TT_GROUP_PICKS.json"] # either path (for Rayleigh) or list of [Rayleigh, Love]
 outfile = "model_dispersion.png"
 
 model = 'All' # 'Weir' 'Jenkins' or 'All'
@@ -140,7 +140,7 @@ def plot_model(model):
             periods,
             wave='love',
             mode=1,
-            velocity="phase",
+            velocity="group",
             flat_earth=True)
         
         ax.plot(periods,velocities, label=model+' love', color=f"C{j}")
@@ -153,7 +153,7 @@ def plot_model(model):
             periods,
             wave="rayleigh",
             mode=1,
-            velocity="phase",
+            velocity="group",
             flat_earth=True)
         
         ax.plot(periods,velocities, label=model+ ' rayleigh', color=f"C{j}", ls="--")

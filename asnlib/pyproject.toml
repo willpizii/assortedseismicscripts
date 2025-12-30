@@ -1,0 +1,15 @@
+[build-system]
+requires	= ["setuptools", "wheel"]
+build-backend	= "setuptools.build_meta"
+
+[project]
+name		= "asnlib"
+version		= "0.0.1"
+description	= "Library of processing functions for ambient seismic noise purposes"
+readme		= "README.md"
+license = { text = "GPL-3.0-or-later" }
+authors		= [{ name = "Will Pizii" }]
+dependencies	= ["matplotlib", "numpy", "pandas", "obspy", "tqdm" ]
+
+[project.scripts]
+asnlib = "asnlib.cli.__main__:main"
