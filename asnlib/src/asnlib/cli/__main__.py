@@ -9,8 +9,8 @@ def main():
     args = sys.argv[2:]
 
     if command == "rotate_ccs":
-        from asnlib.workflows.rotations import main as rotate_main
-        rotate_main(args)
+        from asnlib.workflows.rotations import rotate_ccf_folder
+        rotate_ccf_folder(args)
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)

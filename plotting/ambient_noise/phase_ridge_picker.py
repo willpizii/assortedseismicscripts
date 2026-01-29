@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
 from scipy import signal
+import scipy
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Ellipse
 from tqdm import tqdm
@@ -18,7 +19,7 @@ parser.add_argument("f_type", nargs="?")
 parser.add_argument("dP", nargs="?")
 parser.add_argument("--comp", default="ZZ")
 parser.add_argument("--overlap", "-o", default="0.0")
-parser.add_argument("--snr", "-s", default="2.0")
+parser.add_argument("--snr", "-s", default="5.0")
 parser.add_argument("--filt-type", "-f", default="butterworth")
 args = parser.parse_args()
 
@@ -26,28 +27,32 @@ args = parser.parse_args()
 # PARAMETERS #
 ##############
 
-stack_dir = f"/space/wp280/CCFRFR/linear/CC/{args.comp}"
+stack_dir = f"/space/wp280/CCFRFR/robust/CC/{args.comp}"
 station_pairs = "/space/wp280/CCFRFR/nov_all_pairs.csv"
 sta1 = args.sta1 or "SVIN"
 sta2 = args.sta2 or "KEFE"
 net = "RK"
 
-json_file = f'/space/wp280/CCFRFR/{args.comp}_OVERLAP_REG_PICKS.json'
-outfile = 'single_dispersion_linear.png'
+json_file = None # f'/space/wp280/CCFRFR/{args.comp}_OVERLAP_REG_PICKS.json'
+outfile = None # 'single_dispersion_linear.png'
 
 method = 'phase'
-f_type = args.f_type or 'relative'
+f_type = args.f_type or 'snr'
 filt_type = args.filt_type or 'butterworth'
 
 maxv = 4000
 minv = 1000
-maxP = 15
-minP = 1.0
+maxP = 12
+minP = 0.2
 overlap = float(args.overlap) if args.overlap else 0.0
 dP = float(args.dP) if args.dP else 0.05
 
 snr_thresh = float(args.snr)
-refvel = 3000
+snr_pad = 2.0
+
+step_jump = 2
+wavelengths = 3.0
+output_step = 0.25
 
 fudges = {'LAMB':4.0, 'SMAL': 2.0, 'THOR': 3.0} # or None
 sample_rate = 50.0
@@ -150,16 +155,21 @@ elif f_type == 'snr':
 
             t = tr.times()
             mask = t > 0
-            v = dist / t[mask]
+            v = dist / (t[mask]- period / 8)
             data = tr.data[mask]
 
             # Noise: RMS of the trace outside the zone of interest
-            signal_mask = (v >= 1500) & (v <= 4000)
-            noise_mask  = (v < 1000) | (v > 4500)
+            signal_mask = (v >= minv) & (v <= maxv)
+            noise_mask  = (v < minv / snr_pad) | (v > maxv * snr_pad)
 
             rms_signal = np.sqrt(np.mean(data[signal_mask]**2))
             rms_noise  = np.sqrt(np.mean(data[noise_mask]**2))
             snr_last = rms_signal / (rms_noise + 1e-12)
+
+            if filt_width >= 1 / minP and period == maxP:
+                periods.clear()
+                period /= 2
+                filt_width = 0.00
         
         fsts_snr[period] = {"stream": fst, "fmin": freq_min, "fmax": freq_max, "fcentre": 1.0/period} 
         periods.append(period)
@@ -168,7 +178,6 @@ elif f_type == 'snr':
             break
 
         period -= abs((1.0 / freq_max) - period) * (1- overlap) 
-        
 
 fsts = {}
 vgrid = np.linspace(minv, maxv, 500)  # velocities in m/s
@@ -235,12 +244,12 @@ for P0, fst in fsts.items():
     for tr in fst["stream"]:
         t = tr.times()
         mask = t > 0
-        v = dist / t[mask]
+        v = dist / (t[mask] - fst['fcentre'] / 8)
         data = tr.data[mask]
 
         # Noise: RMS of the trace outside the zone of interest
-        signal_mask = (v >= 1500) & (v <= 4000)
-        noise_mask  = (v < 1000) | (v > 4500)
+        signal_mask = (v >= minv) & (v <= maxv)
+        noise_mask  = (v < minv / snr_pad) | (v > maxv * snr_pad)
 
         rms_signal = np.sqrt(np.mean(data[signal_mask]**2))
         rms_noise  = np.sqrt(np.mean(data[noise_mask]**2))
@@ -252,16 +261,6 @@ for P0, fst in fsts.items():
         # interpolate onto fixed velocity grid
         f_interp = interp1d(v, data, kind='linear', bounds_error=False, fill_value=0.0)
         data_resampled = f_interp(vgrid)
-
-        # Correct sign flip based on previous trace
-        if len(disp) > 0:
-            prev = disp[-1]
-            mask = (np.abs(prev) > 1e-6) & (np.abs(data_resampled) > 1e-6)
-            if np.sum(mask) > 0 and np.sign(np.sum(prev[mask] * data_resampled[mask])) < 0:
-                data_resampled *= -1
-        
-        # Normalize the data
-        data_resampled /= np.max(np.abs(data_resampled))
 
         snrs.append(snr)
         disp.append(data_resampled)
@@ -281,9 +280,6 @@ gradient = abs(np.gradient(disp_array, axis=1))  # gradient along velocity axis
 grad_period = np.gradient(disp_array, axis=0)  # gradient along period axis
 grad_velocity = np.gradient(disp_array, axis=1)  # gradient along velocity axis
 gradient_magnitude = np.sqrt(grad_period**2 + grad_velocity**2)
-
-# Create meshgrid for pcolormesh
-P_mesh, V_mesh = np.meshgrid(periods_array, vgrid)
 
 # Find zero crossings and calculate velocity errors based on gradient width
 zero_crosses = []
@@ -333,7 +329,7 @@ for i, data_resampled in enumerate(disp_array):
             v_error = v_width / 2.0
             
             # Set reasonable bounds on error
-            v_error = np.clip(v_error, 10.0, 200.0)
+            v_error = np.clip(v_error, 10.0, 500.0)
             velocity_errors.append(v_error)
     
     zero_crosses.append({
@@ -350,12 +346,6 @@ gs = GridSpec(2, 1, height_ratios=[8, 1.5], hspace=0.05)
 # Main FTAN plot
 ax = fig.add_subplot(gs[0, 0])
 
-# Plot colored background based on gradient magnitude
-# Use gradient_magnitude for total gradient, or gradient for velocity gradient only
-im = ax.pcolormesh(P_mesh, V_mesh, gradient.T, 
-                   cmap='viridis', shading='auto',
-                   vmin=0, vmax=np.percentile(gradient_magnitude, 95), alpha=0.8)
-
 ax.set_ylabel("Velocity (m/s)")
 ax.set_xlim(minP,maxP)
 ax.set_ylim(minv, maxv)
@@ -363,9 +353,9 @@ ax.set_ylim(minv, maxv)
 critvel = {}
 
 for p in periods:
-    critvel[p] = (1 / p) * dist
+    critvel[p] = (1 / p) * dist * 1 / wavelengths
 
-ax.fill_between(critvel.keys(), critvel.values(), y2=10000, color='white',alpha=0.6)
+ax.fill_between(critvel.keys(), critvel.values(), y2=10000, color='grey',alpha=0.6)
 
 # Plot zero crossings with error ellipses
 for zc in zero_crosses:
@@ -384,7 +374,7 @@ for zc in zero_crosses:
         period_error_avg = (period_error_low + period_error_high) / 2.0
         
         # Plot scatter points
-        ax.scatter([P0]*len(idx), vgrid[idx], color="lime", s=8, zorder=10, 
+        ax.scatter([P0]*len(idx), vgrid[idx], color="lime", s=8, zorder=3, 
                   edgecolors='black', linewidths=0.5)
         
         # Plot error ellipses
@@ -401,7 +391,7 @@ for zc in zero_crosses:
                 facecolor='lime',
                 linewidth=0.8,
                 alpha=0.1,
-                zorder=5
+                zorder=2
             )
             ax.add_patch(ellipse)
 
@@ -412,12 +402,12 @@ if json_file:
             data = json.load(file)
         curve = data[f'{net}_{sta1}_{net}_{sta2}']
         ax.plot(curve[0], [1000 * v for v in curve[1]], color="cyan", 
-                linewidth=2.5, label='Picked curve', zorder=15)
-        ax.legend()
+                linewidth=2.5, label='Picked curve', zorder=4)
+        # ax.legend()
     except:
         pass
 
-ax.axvline(dist / refvel, color='r', ls='--', alpha=0.5)
+ax.set_xscale("log")
 
 # SNR plot
 ax2 = fig.add_subplot(gs[1, 0], sharex=ax)
@@ -435,11 +425,117 @@ plt.setp(ax.get_xticklabels(), visible=False)
 # ax.set_ylim(1500,2000)
 
 # Add colorbar
-cbar = plt.colorbar(im, ax=[ax,ax2], label='Gradient Magnitude')
+# cbar = plt.colorbar(im, ax=[ax,ax2], label='Gradient Magnitude')
 
-ax.set_title(f'FTAN of {sta1}-{sta2} : Distance {dist:.0f} m')
+title = f'FTAN of {sta1}-{sta2} : Distance {dist:.0f} m'
+ax.set_title(title)
 
 if outfile:
     plt.savefig(outfile, dpi=150, bbox_inches='tight')
+
+c_click = []
+T_click = []
+
+def find_closest(c_list,c_ref):
+    return np.argmin([np.abs(c-c_ref) for c in c_list])
+
+def ridge_picker(zc, bound_points, regularise=True):
+
+    bp0 = bound_points[0]
+    bp1 = bound_points[1]
+
+    ridge = [[bp0[0],bp0[1]]]
+    point = bp0
+
+    for P in sorted(np.unique([i['period'] for i in zero_crosses])):
+        if P <= bp0[0]:
+            continue
+        elif P > bp1[0]:
+            break
+            
+        V = vgrid[next(i['zero_cross_indices'] for i in zero_crosses if i['period'] == P)]
+        
+        V_C = find_closest(V, point[1])
+        point = [P, V[V_C]]
+        ridge.append(point)
+
+    if regularise:
+        r_p = [r[0] for r in ridge]
+        r_v = [r[1] for r in ridge]
+
+        knots = list(scipy.interpolate.generate_knots(r_p,r_v, s=3000))
+
+        for t in knots[::3]:
+            spl = scipy.interpolate.make_lsq_spline(r_p,r_v, t)
+
+        # reregularise to 0.25s spacing
+        output_step = 0.25
+        rounded_min = np.ceil(min(r_p) / output_step) * output_step
+        rounded_max = np.floor(max(r_p) / output_step) * output_step
+
+        output_range = np.arange(rounded_min, rounded_max + output_step, output_step)
+
+        ridge.clear()
+        for step in output_range:  
+            ridge.append([step, float(spl(step))])
+
+    return(ridge)
+
+locked = False
+
+def keyhandler(event):
+    global locked
+    if event.key != 'space':
+        locked = not locked
+
+    print("locked = ",str(locked))
+
+def onclick(event):
+    if locked:
+        return
+    global c_click
+    global T_click
+
+    c_click.append(event.ydata)
+    T_click.append(event.xdata)
+    ax.scatter(c_click,T_click,marker='x')
+
+    print(c_click,T_click)
+
+    if len(c_click) >= 2:
+        clicks = [[T,c] for T,c in zip(T_click, c_click)]
+
+        try:
+            P_start = periods_array[find_closest(periods_array,min([c[0] for c in clicks]))]
+            P_end   = periods_array[find_closest(periods_array,max([c[0] for c in clicks]))]
+            
+            v_start = next(vgrid[i['zero_cross_indices']] for i in zero_crosses if i['period'] == P_start)[
+                find_closest(next(vgrid[i['zero_cross_indices']] for i in zero_crosses if i['period'] == P_start),
+                             clicks[np.argmin([c[0] for c in clicks])][1])]
+            v_end   = next(vgrid[i['zero_cross_indices']] for i in zero_crosses if i['period'] == P_end)[
+                find_closest(next(vgrid[i['zero_cross_indices']] for i in zero_crosses if i['period'] == P_end),
+                             clicks[np.argmax([c[0] for c in clicks])][1])]
+
+            ridge = ridge_picker(zero_crosses, [[P_start, v_start],[P_end, v_end]])
+
+            c_click.clear()
+            T_click.clear()
+
+        except Exception as e:
+            print("Could not find curve - try again...")
+            print(e)
+            c_click.clear()
+            T_click.clear()
+
+        print([r[0] for r in ridge],[r[1] for r in ridge])
+
+        if 'line' in locals():
+            line.remove()
+
+        line, = ax.plot([r[0] for r in ridge],[r[1] for r in ridge],color="orange",zorder=5,linewidth=5)
+        fig.canvas.draw()
+
+fig.canvas.mpl_connect('button_press_event', onclick)
+fig.canvas.mpl_connect('key_press_event', keyhandler)
 
 plt.show()

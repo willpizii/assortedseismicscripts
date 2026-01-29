@@ -2,12 +2,12 @@ from obspy import read
 import glob, os
 from tqdm import tqdm
 
-path = '/raid4/Iceland/reykjanes_data/raw_data/36_november_2025/service_data/'
-stat = 'LANG'
-data = ['velocity', 'masses', 'environmental']
+path = '/mnt/cambridge/indus/raid4/Iceland/reykjanes_data/raw_data'
+stat = 'LYNG'
+data = ['NODES_TEMP'] # ['velocity', 'masses', 'environmental']
 year = '2025'
 netw = 'RK'
-loca = '41'
+loca = '10'
 
 remove = True
 

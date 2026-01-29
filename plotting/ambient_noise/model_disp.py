@@ -3,11 +3,13 @@ from pysurf96 import surf96
 import matplotlib.pyplot as plt
 import json, os
 
-disp_json = ["/space/wp280/CCFRFR/ZZ_GROUP_PICKS.json", "/space/wp280/CCFRFR/TT_GROUP_PICKS.json"] # either path (for Rayleigh) or list of [Rayleigh, Love]
-outfile = "model_dispersion.png"
+disp_json = ["/space/wp280/CCFRFR/TT_GROUP_NEW_PICKS.json", "/space/wp280/CCFRFR/TT_GROUP_PICKS.json"] # either path (for Rayleigh) or list of [Rayleigh, Love]
+outfile = "model_dispersion_group.png"
 
-model = 'All' # 'Weir' 'Jenkins' or 'All'
+model = None # 'SW Fit' # 'Weir' 'Jenkins' or 'All'
 wavetype = 'both' # 'rayleigh', 'love' or 'both'
+veltype = 'group'
+plot_all = False
 
 fig, ax = plt.subplots(figsize=[10,8])
 
@@ -140,7 +142,7 @@ def plot_model(model):
             periods,
             wave='love',
             mode=1,
-            velocity="group",
+            velocity=veltype,
             flat_earth=True)
         
         ax.plot(periods,velocities, label=model+' love', color=f"C{j}")
@@ -153,7 +155,7 @@ def plot_model(model):
             periods,
             wave="rayleigh",
             mode=1,
-            velocity="group",
+            velocity=veltype,
             flat_earth=True)
         
         ax.plot(periods,velocities, label=model+ ' rayleigh', color=f"C{j}", ls="--")
@@ -167,7 +169,7 @@ def plot_model(model):
             periods,
             wave=wavetype,
             mode=1,
-            velocity="phase",
+            velocity=veltype,
             flat_earth=True)
         
         ax.plot(periods,velocities, label=model, color=f"C{j}")
@@ -177,6 +179,9 @@ if model == 'All':
     for m in ['Weir', 'Jenkins', 'Allas', 'Southern', 'SW Fit', 'BBInv']:
         plot_model(m)
         j+=1
+
+elif model == None:
+    j=1
 
 else:
     j=0
@@ -193,8 +198,8 @@ if disp_json and type(disp_json) == str:
     for key, data in ridge_dict.items():
         p = np.array(data[0], dtype=float)
         v = np.array(data[1], dtype=float)
-
-        ax.plot(p, v, lw=1, color=f"C{j}", alpha=0.1)
+        if plot_all:
+            ax.plot(p, v, lw=1, color=f"C{j}", alpha=0.1)
 
         for pi, vi in zip(p, v):
             vals[pi].append(vi)
@@ -214,7 +219,8 @@ if disp_json and type(disp_json) == str:
     std_vals = np.array(std_vals)
 
     ax.plot(mean_periods, mean_vals, lw=2, color=f"C{j}")
-    ax.fill_between(mean_periods, mean_vals - std_vals, mean_vals + std_vals, color=f"C{j}", alpha=0.5)
+    if not plot_all
+        ax.fill_between(mean_periods, mean_vals - std_vals, mean_vals + std_vals, color=f"C{j}", alpha=0.5)
 
 elif disp_json and type(disp_json) == list:
 

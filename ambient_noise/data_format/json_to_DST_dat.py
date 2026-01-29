@@ -8,8 +8,8 @@ ignore_stations = ['LAMB', 'SMAL', 'THOR']
 
 stations = pd.read_csv('/space/wp280/CCFRFR/frfr_stations.csv')
 
-rayleigh_pat = '/space/wp280/CCFRFR/ZZ_PICKS.json'
-love_pat = '/space/wp280/CCFRFR/TT_PICKS.json' 
+rayleigh_pat = '/space/wp280/CCFRFR/ZZ_OVERLAP_REG_PICKS.json'
+love_pat = '/space/wp280/CCFRFR/TT_OVERLAP_REG_PICKS.json' 
 
 out_path = '/space/wp280/DAST/ReykjanesRawData'
 
