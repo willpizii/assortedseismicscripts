@@ -3,7 +3,6 @@ from obspy.geodetics.base import gps2dist_azimuth
 import os
 import numpy as np
 import pywt
-from scipy.signal import argrelextrema
 
 from asnlib.dispersion.utils import (
     symmetrise_trace,
@@ -12,6 +11,8 @@ from asnlib.dispersion.utils import (
     get_signal_snr,
     get_wavelengths
 )
+
+from asnlib.dispersion.plot import plot_points, plot_traces
 
 class cwt():
 
@@ -52,6 +53,7 @@ class cwt():
 
     def configure(self,
                   wavelet:str = 'cmor1.5-1.0',
+                  method: str = 'group',
                   minP:float = 0.5,
                   maxP:float = 10.0,
                   minV:float = 1000,
@@ -75,6 +77,7 @@ class cwt():
             wavelength_cutoff (float, optional): _description_. Defaults to 3.0.
         """
 
+        self.method = method
         self.minP = minP
         self.maxP = maxP
         self.minV = minV
@@ -93,7 +96,7 @@ class cwt():
     def run(self):
         coef, _ = pywt.cwt(self.trace.data.astype(float), self.scales,
                                self.wavelet, sampling_period = 1/self.fs)
-        
+                
         env = np.abs(coef)
         for i in range(len(env)):
             env[i] /= np.max(env[i])
@@ -104,30 +107,65 @@ class cwt():
 
         vtraces = []
 
-        for i, P in enumerate(self.periods):
-            row = env[i]
+        if self.method == 'group':
 
-            trace = self.trace.copy()
+            for i, P in enumerate(self.periods):
+                row = env[i]
 
-            V, vmask = signal_time_to_velocity(self, trace, 'group')
+                trace = self.trace.copy()
 
-            trace.data = row
-            snr = get_signal_snr(self, trace, 'group')
-            snrs.append(snr)
+                V, vmask = signal_time_to_velocity(self, trace, 'group')
 
-            trace.data = row[vmask]
-            valid_mask = (V >= self.minV) & (V <= self.maxV)
-            trace.data = trace.data[valid_mask]
-            V = V[valid_mask]
+                trace.data = row
+                snr = get_signal_snr(self, trace, 'group')
+                snrs.append(snr)
 
-            max_value = V[np.argmax(trace.data)]
-            max_value = max_value if self.minV < max_value < self.maxV else np.nan
+                trace.data = row[vmask]
+                valid_mask = (V >= self.minV) & (V <= self.maxV)
+                trace.data = trace.data[valid_mask]
+                V = V[valid_mask]
 
-            v_maxamps.append(max_value)
+                max_value = V[np.argmax(trace.data)]
+                max_value = max_value if self.minV < max_value < self.maxV else np.nan
 
-            wavelengths.append(get_wavelengths(self.dist, P, max_value))
+                v_maxamps.append(max_value)
 
-            vtraces.append([V,trace])
+                wavelengths.append(get_wavelengths(self.dist, P, max_value))
+
+                vtraces.append([V,trace])
+
+        elif self.method == 'phase':
+            phase = np.angle(coef)
+
+            for i, P in enumerate(self.periods):
+                row = env[i]
+                # Direct pi/2 phase correction
+                rowp = np.gradient(np.angle(np.exp(1j * (phase[i] + np.pi/2))))
+
+                trace = self.trace.copy()
+
+                V, vmask = signal_time_to_velocity(self, trace, 'phase', centre_period=P)
+
+                trace.data = row
+                snr = get_signal_snr(self, trace, 'phase', centre_period=P)
+                snrs.append(snr)
+
+                trace.data = rowp[vmask]
+                valid_mask = (V >= self.minV) & (V <= self.maxV)
+                trace.data = trace.data[valid_mask]
+                V = V[valid_mask]
+
+                max_values = V[np.abs(trace.data) > 1]
+
+                v_maxamps.append(max_values)    
+
+                wavelengths.append([get_wavelengths(self.dist, P, MV) for MV in max_values])     
+
+                plot_trace = self.trace.copy()
+                plot_trace.data = np.angle(np.exp(1j * (phase[i] + np.pi/2)))[vmask]
+                plot_trace.data = plot_trace.data[valid_mask]
+            
+                vtraces.append([V,plot_trace])     
 
         self.snrs = snrs
         self.velocity_points = v_maxamps
@@ -144,82 +182,14 @@ class cwt():
         else:
             ax = ax
 
-        # flatten all data
-        all_centres = []
-        all_zcs = []
-        all_colors = []
-
-        for C, ZCs, Ws, SNR in zip(self.periods, self.velocity_points, 
-                                        self.wavelengths, self.snrs):          
-            for ZC, W in zip([ZCs], [Ws]):                
-                all_centres.append(C)
-                all_zcs.append(ZC)
-                all_colors.append('k' if W > self.wavelength_cutoff and SNR > self.snr_cutoff else 'r')
-
-        # Convert to arrays
-        all_centres = np.array(all_centres)
-        all_zcs = np.array(all_zcs)
-
-        # Separate by color
-        mask_black = np.array(all_colors) == 'k'
-
-        # Plot all black points at once
-        if mask_black.any():
-            ax.scatter(all_centres[mask_black], all_zcs[mask_black],
-                        marker='.', color='k')
-
-        # Plot all red points at once
-        if (~mask_black).any():
-            ax.scatter(all_centres[~mask_black], all_zcs[~mask_black],
-                        marker='.', color='r')
-
         if xscalelog:    
             ax.set_xscale('log')
 
-        ax.set_xlim(self.minP, self.maxP)
-        ax.set_ylim(self.minV, self.maxV)
+        ax = plot_points(self, ax)
 
-        ax.set_title("FTAN of "+get_attribute(self.sta1,'sta')+'-'+
+        ax.set_title("CWT of "+get_attribute(self.sta1,'sta')+'-'+
                         get_attribute(self.sta2,'sta')+', distance: '+
-                        str(round(self.dist))+'m')
+                        str(round(self.dist, -1))+'m')
         
         if plot_background:
-
-            try:    
-                from scipy.interpolate import interp1d
-
-                velocity_grid = np.linspace(self.minV, self.maxV, 200)
-                period_grid = np.linspace(min(self.periods), max(self.periods), 200)
-
-                # Initialize the grid matrix
-                grid_data_irregular = np.zeros((len(self.periods), len(velocity_grid)))
-
-                # Fill the grid by interpolating each trace in velocity direction
-                for i, (V, trace) in enumerate(self.vtraces):
-                    f = interp1d(V, trace.data / max(trace.data), kind='linear', bounds_error=False, fill_value=0)
-                    grid_data_irregular[i, :] = f(velocity_grid)
-
-                # Now interpolate in the period direction
-                # Create interpolator from irregular period points to regular grid
-                period_interpolator = interp1d(
-                    self.periods, 
-                    grid_data_irregular, 
-                    axis=0,  # interpolate along period axis
-                    kind='linear', 
-                    bounds_error=False, 
-                    fill_value=0
-                )
-
-                # Interpolate onto regular period grid
-                grid_data = period_interpolator(period_grid)
-
-                # Now plot the fully regular grid
-                ax.imshow(grid_data.T, aspect='auto', origin='lower',
-                        extent=[period_grid.min(), period_grid.max(),
-                                velocity_grid.min(), velocity_grid.max()],
-                        cmap='seismic', alpha=0.6, zorder=0)
-            except Exception as e:
-                print(e)
-                pass
-
-        plt.show()
+            plot_traces(self, ax, 'seismic')

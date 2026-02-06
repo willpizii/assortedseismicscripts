@@ -16,7 +16,7 @@ from asnlib.dispersion.utils import (
 
 from asnlib.dispersion.plot import(
     plot_points,
-    plot_background
+    plot_traces
 )
 
 class ftan:
@@ -218,99 +218,17 @@ class ftan:
         else:
             ax = ax
 
-        # flatten all data
-        all_centres = []
-        all_zcs = []
-        all_colors = []
-        all_xerr_lower = []
-        all_xerr_upper = []
-        all_yerr = []
-
-        for C, ZCs, Ves, Pe, Ws, SNR in zip(self.periods, self.velocity_points, 
-                                        self.v_errors, self.fbounds, 
-                                        self.wavelengths, self.snrs):
-            # Compute x errors once for this group (same Pe for all ZCs)
-            xerr = np.abs(1 / np.array(Pe) - C)
-            
-            for ZC, Ve, W in zip(ZCs, Ves, Ws):
-                # Compute y errors for this point
-                yerr = np.abs(Ve)
-                
-                all_centres.append(C)
-                all_zcs.append(ZC)
-                all_colors.append('k' if W > self.wavelength_cutoff and SNR > self.snr_cutoff else 'r')
-                all_xerr_lower.append(xerr[0])
-                all_xerr_upper.append(xerr[1])
-                all_yerr.append(yerr)
-
-        # Convert to arrays
-        all_centres = np.array(all_centres)
-        all_zcs = np.array(all_zcs)
-        all_yerr = np.array(all_yerr).T  # Shape: (2, N)
-        all_xerr = np.array([all_xerr_lower, all_xerr_upper])  # Shape: (2, N)
-
-        # Separate by color
-        mask_black = np.array(all_colors) == 'k'
-
-        # Plot all black points at once
-        if mask_black.any():
-            ax.errorbar(all_centres[mask_black], all_zcs[mask_black], 
-                        yerr=all_yerr[:, mask_black], xerr=all_xerr[:, mask_black],
-                        fmt='.', color='k', linestyle='',elinewidth=0.2)
-
-        # Plot all red points at once
-        if (~mask_black).any():
-            ax.errorbar(all_centres[~mask_black], all_zcs[~mask_black],
-                        yerr=all_yerr[:, ~mask_black], xerr=all_xerr[:, ~mask_black],
-                        fmt='.', color='r', linestyle='',elinewidth=0.2)
-
-        if xscalelog:    
-            ax.set_xscale('log')
-
-        ax.set_xlim(self.minP, self.maxP)
-        ax.set_ylim(self.minV, self.maxV)
+        ax = plot_points(self, ax)
 
         ax.set_title("FTAN of "+get_attribute(self.sta1,'sta')+'-'+
                         get_attribute(self.sta2,'sta')+', distance: '+
-                        str(round(self.dist))+'m')
+                        str(round(self.dist, -1))+'m')
+
+        if xscalelog:    
+            ax.set_xscale('log')
         
         if plot_background:
-
-            try:    
-                from scipy.interpolate import RegularGridInterpolator
-
-                velocity_grid = np.linspace(self.minV, self.maxV, 200)
-                period_grid = np.linspace(min(self.periods), max(self.periods), 200)
-
-                # Initialize the grid matrix
-                grid_data_irregular = np.zeros((len(self.periods), len(velocity_grid)))
-
-                # Fill the grid by interpolating each trace in velocity direction
-                for i, (V, trace) in enumerate(self.vtraces):
-                    f = interp1d(V, trace.data / max(trace.data), kind='linear', bounds_error=False, fill_value=0)
-                    grid_data_irregular[i, :] = f(velocity_grid)
-
-                # Now interpolate in the period direction
-                # Create interpolator from irregular period points to regular grid
-                period_interpolator = interp1d(
-                    self.periods, 
-                    grid_data_irregular, 
-                    axis=0,  # interpolate along period axis
-                    kind='linear', 
-                    bounds_error=False, 
-                    fill_value=0
-                )
-
-                # Interpolate onto regular period grid
-                grid_data = period_interpolator(period_grid)
-
-                # Now plot the fully regular grid
-                ax.imshow(grid_data.T, aspect='auto', origin='lower',
-                        extent=[period_grid.min(), period_grid.max(),
-                                velocity_grid.min(), velocity_grid.max()],
-                        cmap='seismic', alpha=0.6, zorder=0)
-            except:
-                pass
+            plot_traces(self, ax, 'seismic')
 
         if pick_interactive:
 
